@@ -129,7 +129,7 @@ module ActiveJob
         end
 
         def build_message(queue_name, serialized_job, timestamp)
-          {
+          result = {
             queue_url: queue_url(queue_name),
             message_body: serialized_job,
             delay_seconds: calculate_delay(timestamp),
@@ -144,6 +144,15 @@ module ActiveJob
               }
             }
           }
+
+          if queue_name.ends_with?('.fifo')
+            job = JSON.parse(serialized_job)
+            id_argument = job['arguments'].find { |arg| arg.is_a?(Hash) && arg.keys.first == '_aj_globalid' }
+            group_id = id_argument.nil? ? job['arguments'].first.to_s : id_argument['_aj_globalid']
+            result[:message_group_id] = group_id
+            result[:message_deduplication_id] = job['job_id']
+          end
+          result
         end
 
         def queue_url(queue_name)
